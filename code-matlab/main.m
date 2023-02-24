@@ -2,9 +2,9 @@ close all;
 clear variables;
 
 warning('off');
-addpath(genpath('./ASPIRE'))
-addpath('./easyspin-5.2.33/easyspin')
-addpath('./SphericalHarmonics')
+addpath(genpath('..\..\ASPIRE'))
+addpath('..\..\easyspin-5.2.33/easyspin')
+addpath('..\..\SphericalHarmonics')
 
 rng(10);
 
@@ -19,43 +19,17 @@ LL = size(vol, 1);
 
 vol = LL * vol / sqrt(sum(vol.^2, 'all'));
 
-[X, Y, Z] = meshgrid(-LL/2:LL/2-1, -LL/2:LL/2-1, -LL/2:LL/2-1);
-tmp = sqrt((X.^2 + Y.^2 + Z.^2)) <= LL/2;
-vol_cropped = zeros(size(vol));
-for i=1:LL
-    for j=1:LL
-        for k=1:LL
-            if tmp(i, j, k)
-                vol_cropped(i, j, k) = vol(i, j, k);
-            end
-        end
-    end
-end
-vol = vol_cropped;
-
-
-% %% Volume expansion in 3-D Fourier-Bessel basis
-% r_cut = 1 / 2;
-% rad_size = floor(L / 2);
-% % Generate 3-D Fourier-Bessel basis
-% [Psilms, Psilms_2D, jball, jball_2D] = precompute_spherical_basis(rad_size, ...
-%     r_cut, ell_max, L);
-% % Expand volume in 3-D Fourier-Bessel basis
-% [~, vol_true_trunc] = expand_vol_spherical_basis(vol, rad_size, ell_max, ...
-%     L, Psilms, jball);
-% vol_true_trunc = real(icfftn(vol_true_trunc));
-% % WriteMRC(vol_true_trunc, 1, 'volume.mrc');
-% x_lms = expand_vol_spherical_basis(vol_true_trunc, rad_size, ell_max, L, ...
-%     Psilms, jball);
-
-
 %% Micrograph generation
 % Density of projection images in the measurement
 gamma = 0.4;
-% Size of the micrograph.
-N = 6000 * LL / L;
+% Size of the micrographs.
+N = 100 * LL / L;
 N = N - mod(N, LL);
+N_downsampled = round(N * L / LL);
+Nd = (N_downsampled / L) ^ 2;
 
+% Should be 2*LL-1 for the well-separated case, and L for the arbitrary
+% spacing distribution case.
 W = 2 * LL - 1;
 
 rotations = genRotationsGrid(15);
@@ -63,19 +37,25 @@ average_norm_squared = calc_average_norm_squared_projection(vol, ...
     rotations);
 
 SNR = 1;
-
-I_clean = generate_clean_micrograph_2d_rots_new(vol, ...
-    W, N, round(gamma * (N ^ 2 / LL ^ 2)), 1);
 sigma2 = average_norm_squared / (LL^2 * SNR);
 sigma = sqrt(sigma2);
-I = I_clean + normrnd(0, sigma, size(I_clean));
-N_downsampled = round(N * L / LL);
-I_downsampled = cryo_downsample(I, N_downsampled);
-N_downsampled_correct_factorial = N_downsampled - mod(N_downsampled, L);
-I_downsampled = I_downsampled(1:N_downsampled_correct_factorial, ...
-    1:N_downsampled_correct_factorial);
-patches = micrograph2patches(I_downsampled, L);
-Nd = size(patches, 1);
+
+patches = zeros(4 * Nd, L, L);
+for mic=1:4
+    I_clean = generate_clean_micrograph_2d_rots(vol, ...
+        W, N, round(gamma * (N ^ 2 / LL ^ 2)), 1);
+    I = I_clean + normrnd(0, sigma, size(I_clean));
+    % First micrograph generation method. The second micrograph generation
+    % method requires downsampling of the target volume and generation of
+    % the micrograph using it.
+    I_downsampled = cryo_downsample(I, N_downsampled);
+    N_downsampled_correct_factorial = N_downsampled - mod( ...
+        N_downsampled, L);
+    I_downsampled = I_downsampled(1:N_downsampled_correct_factorial, ...
+        1:N_downsampled_correct_factorial);
+    patches_mic = micrograph2patches(I_downsampled, L);
+    patches(1 + (mic - 1)*Nd: mic*Nd, :, :) = patches_mic;
+end
 
 %% Initializations
 % Volume expansion in 3-D Fourier-Bessel basis
@@ -140,6 +120,7 @@ psi_lsNn = calc_psi_lNs(ell_max, psi_Nn, betas, L, s_lens, n_list);
 
 lms_list = calc_lms_list(ell_max, s_lens);
 
+% Precompute the g term
 gs = calc_g(Ls, L, rotations, psi_lsNn, lms_list, n_list);
 
 STOCHASTIC_FACTOR = 0.05;

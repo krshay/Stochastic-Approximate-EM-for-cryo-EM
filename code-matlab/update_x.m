@@ -1,17 +1,34 @@
 function [x_updated, A, y] = update_x(Ls, rotations, ...
     ell_max, s_lens, length_x, lms_list, gs, ...
     Ipsis_cell, pl_rot_curr)
+% This function updates x according to Eq. (29).
+%
+% Inputs:
+%
+% Ls: a list of the possible 2D shifts
+% rotations: a 3D array of rotation matrices
+% ell_max: the maximum spherical harmonic degree used in the reconstruction
+% s_lens: a vector of the sizes of s indices
+% length_x: length of the coefficients vector
+% lms_list: a list of the spherical harmonic degree and order
+% gs: the precomputed g function
+% Ipsis_cell: the I * psi values for the sampled patches
+% pl_rot_curr: the probability function
+%
+% Outputs:
+%
+% x_updated: the updated x
+% A: the matrix A
+% y: the vector y, such that y = AX
 
 As = cell(size(Ls, 1), 1);
 ys = cell(size(Ls, 1), 1);
-
 
 [yaw, pitch, roll] = dcm2angle(rotations, 'ZYZ');
 roll = roll + pi/2;
 omegas = [yaw, pitch, roll];
 
 num_shifts = size(Ls, 1);
-
 
 parfor l=1:num_shifts
     g = gs{l};

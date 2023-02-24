@@ -5,7 +5,7 @@ function [x_curr, rho_curr] = EM_stochastic_parallel(patches_all, ...
 % An approximate expectation-maximization (EM) algorithm for
 % 3D reconstruction of a volume directly from cryo-EM micrographs.
 %
-% The input parameters to the function are:
+% Inputs:
 %
 % patches_all: a 3D array of 2D patches
 % x_init: an array of 3D coefficients of the initial volume estimate
@@ -26,7 +26,7 @@ function [x_curr, rho_curr] = EM_stochastic_parallel(patches_all, ...
 % gs: the precomputed g function
 % NUM_ITERS: number of iterations to perform
 %
-% The output parameters are:
+% Outputs:
 %
 % x_curr: an array of 3D coefficients of the final volume estimate
 % rho_curr: a 2D array of the final estimates of the probabilities
@@ -71,7 +71,7 @@ while count <= NUM_ITERS
     patches_all_sampled = patches_all(SAMPLES, :, :);
     Nd = NUMBER_OF_PATCHES_PER_ITERATION;
 
-    % Preprocess the Ipsi values for the sampled patches
+    % Preprocess the I * psi values for the sampled patches
     Ipsis_cell_sampled = preprocess_Ipsi(L, Ls, psi_lsNn, ell_max, ...
         s_lens, n_list, patches_all_sampled);
     
@@ -100,7 +100,7 @@ while count <= NUM_ITERS
             Ls(ll, 2) + 1, :));
     end
     S_reduced(S_reduced == 0) = NaN;
-    S_normalized = S - permute(min(S_reduced, [], [1, 2]), [1, 2, 4, 3]);
+    S_normalized = S: permute(min(S_reduced, [], [1, 2]), [1, 2, 4, 3]);
     clear S
     clear S_reduced
 
@@ -122,7 +122,7 @@ while count <= NUM_ITERS
     clear likelihood_func_l_rot;
 
     % Update rho
-    rho_updated = rho_step(pl_rot_curr, Nd);
+    rho_updated = update_rho(pl_rot_curr, Nd);
 
     pl_rot_curr_cell = cell(num_shifts, 1);
 

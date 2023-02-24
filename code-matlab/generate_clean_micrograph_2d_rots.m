@@ -1,53 +1,80 @@
-function [I, locations] ...
-    = generate_clean_micrograph_2d_rots(volume, W, N, m, seed)
-%     Form an N*N matrix containing target images at random locations and
-% rotations.
-%     Args:
-%         volume: the L * L * L volume.
-%         W: separation between images; L for arbitrary spacing
-% distribution, 2*L-1 for the well-separated case.
-%         N: the width and height of the required micrograph.
-%         m: wanted number of images to place.
-%         K: number of rotations.
-%         seed: random seed (default is 1).
+function [Y, placed] = generate_clean_micrograph_2d_rots( ...
+    volume, W, N, m, seed)
+% This function generates a clean micrograph.
 %
-%     Returns:
-%         I: N*N matrix containing target images at random
-% locations and rotations.
-%         locations: list of 2-D locations of the target images in I.
-if nargin <= 4
-    seed = 1;
-end
+% Inputs:
+%
+% volume: the target volume
+% W : the required separation
+% N: the size of the micrograph
+% m: number of projections to place
+% seed: random seed
+%
+% Outputs:
+%
+% Y: micrograph of size NxN (clean)
+% placed: actual number of occurrences of the signal X in Y.
+
 rng(seed);
-L = size(volume, 1);
-m = round(m);
-mask = zeros(N + W, N + W);
-% The locations table records the chosen signal locations.
-locations = {};
+
+rangeW = 0:(W-1);
+
+% The mask has the same size as the micrograph. Each pixel in the mask
+% corresponds to a possible location for the upper-left corner of the
+% signal, to be placed in the micrograph. A value of zero means the
+% spot is free, while a value of 1 means the spot is forbidden (either
+% because a signal will already be there, or because it is in the area
+% of separation of another signal.)
+mask = zeros(N, N);
+% The locations table recors the chosen signal locations.
+locations = zeros(m, 2);
 % This counter records how many signals we successfully placed.
 placed = 0;
-max_trials = 5*m;
-I = zeros(N, N);
-rotations = rand_rots(m);
-for ii=1:max_trials
+% Since placement is random, there is a chance that we will get a lot
+% of failed candidates. To make up for it, we allow for more than m
+% trials. But we still put a hard cap on it to avoid an infinite loop.
+max_trials = 4*m;
+
+rotations = rand_rots(max_trials);
+K = size(rotations, 3);
+
+for counter = 1 : max_trials
+
     % Pick a candidate location for the upper-left corner of the signal
-    candidate = randi(N - W, 2, 1);
+    candidate = randi(N-W+1, 1, 2);
+
     % Check if there is enough room, taking the separation rule into
     % account. That is, a square of size WxW with upper-left corner
     % specified by the candidate must be entirely free.
-    if ~any(mask(candidate(1):candidate(1)+2*W-1-1, ...
-            candidate(2):candidate(2)+2*W-1-1), 'all')
+    if all(mask(candidate(1)+rangeW, candidate(2)+rangeW) == 0)
+
         % Record the successful candidate
-        locations{placed + 1} = candidate;
-        % Mark the area as reserved
-        mask(candidate(1):candidate(1)+W-1, candidate(2):candidate(2)+W-1) = 1;
         placed = placed + 1;
-        projection = vol_project(volume, rotations( :, :, randi(placed)));
-        I(candidate(1):candidate(1)+L-1, ...
-            candidate(2):candidate(2)+L-1) = projection;
+        locations(placed, :) = candidate;
+
+        % Mark the area as reserved
+        mask(candidate(1)+rangeW, candidate(2)+rangeW) = 1;
+
         % Stop if we placed sufficiently many signals successfully.
         if placed >= m
-            break
+            break;
         end
+
     end
+
+end
+
+% Now that we have a list of locations, actually go ahead and build the
+% micrograph.
+L = size(volume, 1);
+assert(size(volume, 2) == L, 'X must be square.');
+rangeL = 0 : (L-1);
+Y = zeros(N);
+%    Y = zeros(N, N,'gpuArray');
+projections = vol_project(volume, rotations( :, :, randi(K, [1 placed])));
+for k = 1 : placed
+    Y(locations(k, 1) + rangeL, ...
+        locations(k, 2) + rangeL) = projections( :, :, k);
+end
+
 end

@@ -1,16 +1,11 @@
 function gs = calc_g(Ls, L, rotations, psi_lsNn, lms_list, n_list)
-
+% This function calculates the g term of Eq. (35).
 K = size(rotations, 3);
 [yaw, pitch, roll] = dcm2angle(rotations, 'ZYZ');
 roll = roll + pi/2;
 omegas = [yaw, pitch, roll];
 
 num_shifts = size(Ls, 1);
-
-% Ds = cell(ell_max + 1, 1);
-% for ell=0:ell_max
-%     Ds{ell + 1} =  calc_wignerd(ell, omegas);
-% end
 
 gs = cell(num_shifts, 1);
 parfor l=1:num_shifts

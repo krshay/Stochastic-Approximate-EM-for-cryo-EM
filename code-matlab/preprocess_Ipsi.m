@@ -1,5 +1,5 @@
 function Ipsis = preprocess_Ipsi(L, Ls, psi_lsNn, ell_max, s_lens, n_list, patches)
-
+% Preprocessing of the I * psi.
 Ipsis = cell(size(Ls, 1), 1);
 parfor l=1:size(Ls, 1)
     Ipsi = zeros(size(patches, 1), ell_max+1, 2*ell_max + 1, max(s_lens));
@@ -16,9 +16,4 @@ parfor l=1:size(Ls, 1)
     end
     Ipsis{l} = Ipsi;
 end
-% Ipsi = zeros(size(Ls, 1), size(patches, 1), ell_max+1, 2*ell_max + 1, max(s_lens));
-% for l=1:size(Ls, 1)
-%     Ipsi_l = Ipsis{l};
-%     save("/data/shaykreymer/vonneuman/Ipsi_"+num2str(l)+".mat", "Ipsi_l")
-% end
 end
