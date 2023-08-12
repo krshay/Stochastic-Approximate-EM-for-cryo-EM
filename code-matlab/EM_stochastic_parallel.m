@@ -71,10 +71,11 @@ while count <= NUM_ITERS
     patches_all_sampled = patches_all(SAMPLES, :, :);
     Nd = NUMBER_OF_PATCHES_PER_ITERATION;
 
-    % Preprocess the I * psi values for the sampled patches
-    Ipsis_cell_sampled = preprocess_Ipsi(L, Ls, psi_lsNn, ell_max, ...
-        s_lens, n_list, patches_all_sampled);
-    
+    % % Preprocess the I * psi values for the sampled patches
+    % Ipsis_cell_sampled = preprocess_Ipsi(L, Ls, psi_lsNn, ell_max, ...
+    %     s_lens, n_list, patches_all_sampled);
+    %%
+    tic
     % Calculate the probability function
     Ss = cell(num_shifts, 1);
     for l=1:num_shifts
@@ -100,27 +101,65 @@ while count <= NUM_ITERS
             Ls(ll, 2) + 1, :));
     end
     S_reduced(S_reduced == 0) = NaN;
-    S_normalized = S: permute(min(S_reduced, [], [1, 2]), [1, 2, 4, 3]);
+    S_normalized = S - permute(min(S_reduced, [], [1, 2]), [1, 2, 4, 3]);
     clear S
     clear S_reduced
 
     S_normalized = max(S_normalized, 0);
-    pI_curr = exp(-S_normalized / (2 * sigma2));
+    pI_curr_old = exp(-S_normalized / (2 * sigma2));
     clear S_normalized
-    for p=1:Nd
-        sum_p = 0;
-        for ll=1:num_shifts
-            sum_p_ll = sum(pI_curr(:, Ls(ll, 1) + 1, Ls(ll, 2) + 1, p));
-            sum_p = sum_p + sum_p_ll;
+    toc
+    tic
+    pI_curr_old = permute(pI_curr_old, [4, 2, 3, 1]);
+    pI_curr_old = pI_curr_old ./ sum(pI_curr_old, [2, 3, 4]);
+    pI_curr_old = permute(pI_curr_old, [4, 2, 3, 1]);
+    % for p=1:Nd
+    %     sum_p = 0;
+    %     for ll=1:num_shifts
+    %         sum_p_ll = sum(pI_curr_old(:, Ls(ll, 1) + 1, Ls(ll, 2) + 1, p));
+    %         sum_p = sum_p + sum_p_ll;
+    %
+    %     end
+    %     pI_curr_old(:, :, :, p) = pI_curr_old(:, :, :, p) / sum_p;
+    % end
+    toc
 
-        end
-        pI_curr(:, :, :, p) = pI_curr(:, :, :, p) / sum_p;
+    %%
+    tic
+    norm_value = zeros(NUMBER_OF_PATCHES_PER_ITERATION, num_shifts, K);
+    Mask = zeros(2*L, 2*L);
+    Mask(1:L, 1:L) = 1;
+    Mask_k = fft2(Mask);
+    Mask_k_k = fft2(Mask_k);
+    Z_patches_k = fft2(permute(patches_all_sampled, [2, 3, 1]), 2*L, 2*L);
+    [u, v] = meshgrid(0:2*L-1, 0:2*L-1);
+    coeffs = exp(-1j * 2 * pi ...
+        * (u .* permute(Ls( :, 1), [2, 3, 1]) ...
+        + v .* permute(Ls( :, 2), [2, 3, 1])) ...
+        / (2*L));
+    for k=1:K
+        rot = rotations( :, :, k);
+        Pfrot = vol_project(volume_curr, rot);
+        Z_Pfrot_k = fft2(Pfrot, 2*L, 2*L);
+        norm_value( :, :, k) = squeeze(pagenorm( ...
+            ifft2(Mask_k_k .* ...
+            fft2(Z_patches_k - permute(coeffs .* Z_Pfrot_k, [1, 2, 4, 3])) ...
+            ), "fro"));
     end
+    norm_squared_value = norm_value.^2 / (num_shifts^3);
+    norm_squared_value_normalized = norm_squared_value - min(norm_squared_value, [], [2, 3]);
+    pI_curr = exp(-norm_squared_value_normalized / (2 * sigma2));
+    toc
+    tic
+    pI_curr = pI_curr ./ sum(pI_curr, [2, 3]);
+    pI_curr = permute(reshape(pI_curr, [NUMBER_OF_PATCHES_PER_ITERATION, 2 * L, 2 * L, K]), [4, 3, 2, 1]);
+    toc
+
     likelihood_func_l_rot = pI_curr .* permute(rho_curr, [3, 1, 2]);
     pl_rot_curr = likelihood_func_l_rot ./ sum(likelihood_func_l_rot, ...
         [1, 2, 3]);
     clear likelihood_func_l_rot;
-
+    %%
     % Update rho
     rho_updated = update_rho(pl_rot_curr, Nd);
 

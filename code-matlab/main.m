@@ -9,68 +9,94 @@ addpath('..\..\SphericalHarmonics')
 rng(10);
 
 % Length of each dimension of the volume.
+LL = 240;
+
+% Length of each dimension of the downsampled volume.
 L = 11;
 
-%% Volume generation
-vol = load("emd_2660_cropped.mat");
-vol = vol.emd_2660_cropped;
+directory = 'C:\Users\kreym\My Drive\PhD\Code\EMPIAR_10028_data\phase_flipped\';
+files = dir(fullfile(directory, '*.mrcs'));
 
-LL = size(vol, 1);
+patches = [];
+for i=[1] %, 7, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20]
+    %% Micrographs load
+    micrograph = ReadMRC(fullfile(files(i).folder, files(i).name));
+    micrograph = micrograph - mean(micrograph, "all");
+    micrograph = micrograph / norm(micrograph, "fro");
 
-vol = LL * vol / sqrt(sum(vol.^2, 'all'));
+    micrograph_downsampled = cryo_downsample(micrograph, ...
+        round(size(micrograph, 1) * L / LL));
 
-%% Micrograph generation
-% Density of projection images in the measurement
-gamma = 0.4;
-% Size of the micrographs.
-N = 100 * LL / L;
-N = N - mod(N, LL);
-N_downsampled = round(N * L / LL);
-Nd = (N_downsampled / L) ^ 2;
+    micrograph_downsampled = micrograph_downsampled / norm(micrograph_downsampled, "fro");
 
-% Should be 2*LL-1 for the well-separated case, and L for the arbitrary
-% spacing distribution case.
-W = 2 * LL - 1;
 
-rotations = genRotationsGrid(15);
-average_norm_squared = calc_average_norm_squared_projection(vol, ...
-    rotations);
 
-SNR = 1;
-sigma2 = average_norm_squared / (LL^2 * SNR);
-sigma = sqrt(sigma2);
+    N = size(micrograph_downsampled, 1);
+    N = N - mod(N, L);
+    micrograph_downsampled = micrograph_downsampled(1:N, 1:N);
+    if i==1
+        noise_stack = zeros(L, L, 30);
+        noise_stack( :, :, 1) = micrograph_downsampled(31:41, 1:11);
+        noise_stack( :, :, 2) = micrograph_downsampled(42:52, 1:11);
+        noise_stack( :, :, 3) = micrograph_downsampled(53:63, 1:11);
+        noise_stack( :, :, 4) = micrograph_downsampled(111:121, 1:11);
+        noise_stack( :, :, 5) = micrograph_downsampled(122:132, 1:11);
+        noise_stack( :, :, 6) = micrograph_downsampled(133:143, 1:11);
+        noise_stack( :, :, 7) = micrograph_downsampled(159:169, 5:15);
+        noise_stack( :, :, 8) = micrograph_downsampled(170:180, 5:15);
+        noise_stack( :, :, 9) = micrograph_downsampled(8:18, 65:75);
+        noise_stack( :, :, 10) = micrograph_downsampled(31:41, 70:80);
+        noise_stack( :, :, 11) = micrograph_downsampled(104:114, 62:72);
+        noise_stack( :, :, 12) = micrograph_downsampled(115:125, 62:72);
+        noise_stack( :, :, 13) = micrograph_downsampled(169:179, 43:53);
+        noise_stack( :, :, 14) = micrograph_downsampled(36:46, 115:125);
+        noise_stack( :, :, 15) = micrograph_downsampled(47:57, 115:125);
+        noise_stack( :, :, 16) = micrograph_downsampled(58:68, 115:125);
+        noise_stack( :, :, 17) = micrograph_downsampled(69:79, 115:125);
+        noise_stack( :, :, 18) = micrograph_downsampled(36:46, 126:136);
+        noise_stack( :, :, 19) = micrograph_downsampled(47:57, 126:136);
+        noise_stack( :, :, 20) = micrograph_downsampled(58:68, 126:136);
+        noise_stack( :, :, 21) = micrograph_downsampled(69:79, 126:136);
+        noise_stack( :, :, 22) = micrograph_downsampled(104:114, 97:107);
+        noise_stack( :, :, 23) = micrograph_downsampled(104:114, 108:118);
+        noise_stack( :, :, 24) = micrograph_downsampled(164:174, 113:123);
+        noise_stack( :, :, 25) = micrograph_downsampled(164:174, 124:134);
+        noise_stack( :, :, 26) = micrograph_downsampled(39:49, 153:163);
+        noise_stack( :, :, 27) = micrograph_downsampled(50:60, 153:163);
+        noise_stack( :, :, 28) = micrograph_downsampled(61:71, 153:163);
+        noise_stack( :, :, 29) = micrograph_downsampled(61:71, 175:185);
+        noise_stack( :, :, 30) = micrograph_downsampled(72:82, 175:185);
 
-patches = zeros(4 * Nd, L, L);
-for mic=1:4
-    I_clean = generate_clean_micrograph_2d_rots(vol, ...
-        W, N, round(gamma * (N ^ 2 / LL ^ 2)), 1);
-    I = I_clean + normrnd(0, sigma, size(I_clean));
-    % First micrograph generation method. The second micrograph generation
-    % method requires downsampling of the target volume and generation of
-    % the micrograph using it.
-    I_downsampled = cryo_downsample(I, N_downsampled);
-    N_downsampled_correct_factorial = N_downsampled - mod( ...
-        N_downsampled, L);
-    I_downsampled = I_downsampled(1:N_downsampled_correct_factorial, ...
-        1:N_downsampled_correct_factorial);
-    patches_mic = micrograph2patches(I_downsampled, L);
-    patches(1 + (mic - 1)*Nd: mic*Nd, :, :) = patches_mic;
+
+        cov_matrix = calc_cov_matrix(noise_stack, L);
+    end
+    sigma2 = mean(noise_stack.^2, "all");
+    patches = cat(1, patches, micrograph2patches(micrograph_downsampled, L));
 end
+Nd = size(patches, 1);
+
+'Finished micrographs loading.'
 
 %% Initializations
+
+
+%% ell_max = 6
 % Volume expansion in 3-D Fourier-Bessel basis
 ell_max = 10;
 r_cut = 1 / 2;
 rad_size = floor(L / 2);
 % Generate 3-D Fourier-Bessel basis
-[Psilms, Psilms_2D, jball, jball_2D] = precompute_spherical_basis( ...
-    rad_size, r_cut, ell_max, L);
+[Psilms, Psilms_2D, jball, jball_2D] = precompute_spherical_basis(rad_size, ...
+    r_cut, ell_max, L);
 
-vol_init = normrnd(0, 1, [L, L, L]);
-vol_init = 50 * vol_init / sqrt(sum(vol_init.^2, 'all'));
+vol_init = normrnd(0, 1, [L, L, L]); vol_init = 0.1 * vol_init / sqrt(sum(vol_init.^2, 'all'));
+vol_init = vol_init - mean(vol_init, "all");
+% vol_init = load("./L10_results_5micrographs_1376rotations/volume_curr_16.mat");
+% vol_init = vol_init.volume_curr;
 [~, vol_init_trunc] = expand_vol_spherical_basis(vol_init, rad_size, ...
     ell_max, L, Psilms, jball);
 vol_init_trunc = real(icfftn(vol_init_trunc));
+
 
 x_init = expand_vol_spherical_basis(vol_init_trunc, rad_size, ell_max, ...
     L, Psilms, jball);
@@ -84,12 +110,15 @@ for l=1:NUMBER_OF_SHIFTS
     if (Ls(l, 1) == L) && (Ls(l, 2) == L)
         rho_init(Ls(l, 1) + 1, Ls(l, 2) + 1) = beta0;
     else
-        rho_init(Ls(l, 1) + 1, ...
-            Ls(l, 2) + 1) = (1 - beta0) / (NUMBER_OF_SHIFTS - 1);
+        rho_init(Ls(l, 1) + 1, Ls(l, 2) + 1) = (1 - beta0) / (NUMBER_OF_SHIFTS - 1);
     end
 end
 
+% rho_init = load("./L10_results_5micrographs_1376rotations/rho_curr_16.mat");
+% rho_init = rho_init.rho_curr;
+
 % Projection expansion.
+
 s_lens = gen_s_list(ell_max, r_cut, rad_size);
 
 % PSWF parameters
@@ -100,7 +129,7 @@ realFlag = 1;   % Flag indicating whether the data is assumed to
 % be real-valued
 
 % Obtain coefficients while evaluating PSWFs.
-projection = vol_project(vol_true_trunc, eye(3));
+projection = vol_project(vol_init_trunc, eye(3));
 [PSWF_coeffs, PSWF_Nn_p] = pswf_t_f(projection, rad_size, beta, T, ...
     realFlag, []);
 
@@ -120,14 +149,20 @@ psi_lsNn = calc_psi_lNs(ell_max, psi_Nn, betas, L, s_lens, n_list);
 
 lms_list = calc_lms_list(ell_max, s_lens);
 
-% Precompute the g term
-gs = calc_g(Ls, L, rotations, psi_lsNn, lms_list, n_list);
 
-STOCHASTIC_FACTOR = 0.05;
-rotations = genRotationsGrid(25);
-NUM_ITERS = 10;
+STOCHASTIC_FACTOR = 1;
+
+rotations = genRotationsGrid(20);
+
+% tic;
+% gs = calc_g(Ls, L, rotations, psi_lsNn, lms_list, n_list);
+% toc;
+gs = 0;
+
+NUM_ITERS = 1000;
 
 %% Stochastic approximate expectation-maximization
 [x_est, rho_est] = EM_stochastic_parallel(patches, x_init, rho_init, ...
     L, rotations, sigma2, jball, Psilms, ell_max, s_lens, n_list, ...
     lms_list, Ls, psi_lsNn, STOCHASTIC_FACTOR, gs, NUM_ITERS);
+
