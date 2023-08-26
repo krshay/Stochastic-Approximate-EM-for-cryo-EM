@@ -29,8 +29,6 @@ for i=[1] %, 7, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20]
 
     micrograph_downsampled = micrograph_downsampled / norm(micrograph_downsampled, "fro");
 
-
-
     N = size(micrograph_downsampled, 1);
     N = N - mod(N, L);
     micrograph_downsampled = micrograph_downsampled(1:N, 1:N);
@@ -152,7 +150,7 @@ lms_list = calc_lms_list(ell_max, s_lens);
 
 STOCHASTIC_FACTOR = 1;
 
-rotations = genRotationsGrid(20);
+rotations = genRotationsGrid(7);
 
 % tic;
 % gs = calc_g(Ls, L, rotations, psi_lsNn, lms_list, n_list);

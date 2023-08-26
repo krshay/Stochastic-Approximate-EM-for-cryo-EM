@@ -91,7 +91,7 @@ while count <= NUM_ITERS
     for l=1:num_shifts
         S(:, Ls(l, 1) + 1, Ls(l, 2) + 1, :) = Ss{l};
     end
-    clear Ss
+    % clear Ss
 
     % Reduce the size of S to only include the non-zero elements, and
     % normalize the values in S to be between 0 and 1
@@ -102,14 +102,12 @@ while count <= NUM_ITERS
     end
     S_reduced(S_reduced == 0) = NaN;
     S_normalized = S - permute(min(S_reduced, [], [1, 2]), [1, 2, 4, 3]);
-    clear S
-    clear S_reduced
+    % clear S
+    % clear S_reduced
 
     S_normalized = max(S_normalized, 0);
     pI_curr_old = exp(-S_normalized / (2 * sigma2));
-    clear S_normalized
-    toc
-    tic
+    % clear S_normalized
     pI_curr_old = permute(pI_curr_old, [4, 2, 3, 1]);
     pI_curr_old = pI_curr_old ./ sum(pI_curr_old, [2, 3, 4]);
     pI_curr_old = permute(pI_curr_old, [4, 2, 3, 1]);
@@ -125,34 +123,72 @@ while count <= NUM_ITERS
     toc
 
     %%
+    % tic
+    % norm_value = zeros(NUMBER_OF_PATCHES_PER_ITERATION, num_shifts, K);
+    % 
+    % Mask = zeros(2*L, 2*L);
+    % Mask(1:L, 1:L) = 1;
+    % Mask_k = fft2(Mask);
+    % Mask_k_k = fft2(Mask_k);
+    % Z_patches_k = fft2(permute(patches_all_sampled, [2, 3, 1]), 2*L, 2*L);
+    % 
+    % precompute_MZ_patches = Mask_k_k .* ...
+    %     fft2(Z_patches_k);
+    % [u, v] = meshgrid(0:2*L-1, 0:2*L-1);
+    % Ls_u = Ls(:, 1);
+    % Ls_v = Ls(:, 2);
+    % Pfrots = vol_project(volume_curr, rotations);
+    % Z_Pfrots_k = fft2(Pfrots, 2*L, 2*L);
+    % for l=1:num_shifts
+    %     coeffs = exp(-1j * 2 * pi ...
+    %         * (u * Ls_u(l)...
+    %         + v * Ls_v(l)) / (2*L));
+    %     norm_value( :, l, :) = squeeze(pagenorm( ...
+    %         precompute_MZ_patches - Mask_k_k .* fft2(permute(coeffs .* Z_Pfrots_k, [1, 2, 4, 3]) ...
+    %         ), "fro"));
+    % end
+    % norm_squared_value_old = norm_value.^2 / ((2 * L)^2 * num_shifts^3);
+    % 
+    % norm_squared_value_old_normalized = norm_squared_value_old - min(norm_squared_value_old, [], [2, 3]);
+    % % pI_curr = exp(-norm_squared_value_normalized / (2 * sigma2));
+    % %
+    % % pI_curr = pI_curr ./ sum(pI_curr, [2, 3]);
+    % % pI_curr = permute(reshape(pI_curr, [NUMBER_OF_PATCHES_PER_ITERATION, 2 * L, 2 * L, K]), [4, 3, 2, 1]);
+    % toc
+
     tic
-    norm_value = zeros(NUMBER_OF_PATCHES_PER_ITERATION, num_shifts, K);
+
     Mask = zeros(2*L, 2*L);
     Mask(1:L, 1:L) = 1;
     Mask_k = fft2(Mask);
-    Mask_k_k = fft2(Mask_k);
+
+    patches_norm_squared = (squeeze(pagenorm(permute(patches_all_sampled, [2, 3, 1])))).^2;
     Z_patches_k = fft2(permute(patches_all_sampled, [2, 3, 1]), 2*L, 2*L);
-    [u, v] = meshgrid(0:2*L-1, 0:2*L-1);
-    coeffs = exp(-1j * 2 * pi ...
-        * (u .* permute(Ls( :, 1), [2, 3, 1]) ...
-        + v .* permute(Ls( :, 2), [2, 3, 1])) ...
-        / (2*L));
-    for k=1:K
-        rot = rotations( :, :, k);
-        Pfrot = vol_project(volume_curr, rot);
-        Z_Pfrot_k = fft2(Pfrot, 2*L, 2*L);
-        norm_value( :, :, k) = squeeze(pagenorm( ...
-            ifft2(Mask_k_k .* ...
-            fft2(Z_patches_k - permute(coeffs .* Z_Pfrot_k, [1, 2, 4, 3])) ...
-            ), "fro"));
-    end
-    norm_squared_value = norm_value.^2 / (num_shifts^3);
-    norm_squared_value_normalized = norm_squared_value - min(norm_squared_value, [], [2, 3]);
+
+    Pfrots = vol_project(volume_curr, rotations);
+    Z_Pfrots_k = fft2(Pfrots, 2*L, 2*L);
+    Z_Pfrots2_k = fft2(Pfrots.^2, 2*L, 2*L);
+    C = real(ifft2(conj(Z_Pfrots_k) .* permute(Z_patches_k, [1, 2, 4, 3])));
+    patches_estimates_norm_squared = real(ifft2(Mask_k .* conj(Z_Pfrots2_k)));
+    % tmps1 = zeros(22^2, 1);
+    % tmps2 = zeros(22^2, NUMBER_OF_PATCHES_PER_ITERATION);
+    % for l=1:22^2
+    % [~, tmp] = pI_l_rot_x(patches_all_sampled, Ls(l, :), ...
+    %             rotations( :, :, 1), volume_curr);
+    % tmps1(l) = norm(squeeze(tmp), "fro")^2;
+    % tmps2(l, :) = sum(tmp .* patches_all_sampled, [2, 3]);
+    % end
+    % tmps1 = reshape(tmps1, 22, 22);
+    % est_1 = patches_estimates_norm_squared(:, :, 1);
+    % tmps2 = reshape(tmps2, 22, 22, 289);
+    % C1 = squeeze(C( :, :, 1, :));
+
+    norm_squared_value = permute(patches_norm_squared, [2, 3, 4, 1]) - 2 * C + patches_estimates_norm_squared;
+    norm_squared_value_normalized = norm_squared_value - min(norm_squared_value, [], [1, 2, 3]);
     pI_curr = exp(-norm_squared_value_normalized / (2 * sigma2));
-    toc
-    tic
-    pI_curr = pI_curr ./ sum(pI_curr, [2, 3]);
-    pI_curr = permute(reshape(pI_curr, [NUMBER_OF_PATCHES_PER_ITERATION, 2 * L, 2 * L, K]), [4, 3, 2, 1]);
+
+    pI_curr = pI_curr ./ sum(pI_curr, [1, 2, 3]);
+    pI_curr = permute(pI_curr, [3, 1, 2, 4]);
     toc
 
     likelihood_func_l_rot = pI_curr .* permute(rho_curr, [3, 1, 2]);
