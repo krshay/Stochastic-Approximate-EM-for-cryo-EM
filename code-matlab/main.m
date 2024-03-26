@@ -150,7 +150,9 @@ lms_list = calc_lms_list(ell_max, s_lens);
 
 STOCHASTIC_FACTOR = 1;
 
-rotations = genRotationsGrid(7);
+rotations = genRotationsGrid(35);
+
+A = proj_matrix(L, psi_lsNn, lms_list, n_list, rotations);
 
 % tic;
 % gs = calc_g(Ls, L, rotations, psi_lsNn, lms_list, n_list);
