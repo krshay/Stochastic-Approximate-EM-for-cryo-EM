@@ -152,8 +152,45 @@ STOCHASTIC_FACTOR = 1;
 
 rotations = genRotationsGrid(35);
 
-A = proj_matrix(L, psi_lsNn, lms_list, n_list, rotations);
+%% Check projection matrix
+PR_matrix = proj_matrix(L, psi_lsNn, lms_list, n_list, rotations);
+PR_matrix_1 = PR_matrix( :, :, 1);
+x_init_vec = zeros(size(lms_list, 1), 1);
+for i=1:length(lms_list)
+    ell = lms_list(i, 1);
+    m = lms_list(i, 2);
+    s = lms_list(i, 3);
+    x_init_vec(i) = x_init{ell + 1}(s, m + ell + 1);
+end
 
+
+proj2 = vol_project(vol_init_trunc, rotations( :, :, 1));
+figure; imagesc(proj2)
+
+C = zeros(L ^ 2, (2 * L) ^ 2);
+indices = find(reshape(padarray(ones(L), [L, L], "post"), (2 * L) ^ 2, 1) ~= 0);
+for i=1:L^2
+    C(i, indices(i)) = 1;
+end
+
+Z = C';
+
+shift = [0, 0]; %[41, 50];
+% T1 = circshift(eye((2 * L) ^ 2), shift(1) * 2 * L);
+
+%% TODO: 
+% 1. general shift matrix
+% 2. optimize the sum over N
+T = circshift(eye((2 * L) ^ 2), shift(2) * 2 * L);
+
+patch_matrix = C * T * Z * PR_matrix_1;
+
+proj1 = reshape(real(patch_matrix * x_init_vec), L, L);
+figure; imagesc(proj1)
+
+patch_matrix_pinv = pinv(patch_matrix);
+tmp = patch_matrix_pinv * reshape(squeeze(patches(1, :, :)), [], 1);
+tmp2 = patch_matrix \ reshape(squeeze(patches(1, :, :)), [], 1);
 % tic;
 % gs = calc_g(Ls, L, rotations, psi_lsNn, lms_list, n_list);
 % toc;

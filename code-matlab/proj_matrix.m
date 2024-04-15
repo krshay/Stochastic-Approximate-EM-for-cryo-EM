@@ -14,7 +14,7 @@ for k=1:size(lms_list, 1)
     m = lms_list(k, 2);
     s = lms_list(k, 3);
     for N=-ell:ell
-        D_N_m_ell = permute(flip(D(N + ell + 1, -m + ell + 1, :), 1), [2, 1, 3]);
+        D_N_m_ell = D(-N + ell + 1, -m + ell + 1, :);
         tmp = sum(psi_lsNn{ell + 1}{N + ell + 1}( :, :, 1:n_list(abs(N) + 1), s), 3);
         A_k = A_k + D_N_m_ell .* tmp;
     end
