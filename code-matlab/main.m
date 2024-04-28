@@ -2,9 +2,9 @@ close all;
 clear variables;
 
 warning('off');
-addpath(genpath('..\..\ASPIRE'))
-addpath('..\..\easyspin-5.2.33/easyspin')
-addpath('..\..\SphericalHarmonics')
+addpath(genpath('../../ASPIRE'))
+addpath('../../easyspin-5.2.33/easyspin')
+addpath('../../SphericalHarmonics')
 
 rng(10);
 
@@ -14,7 +14,7 @@ LL = 240;
 % Length of each dimension of the downsampled volume.
 L = 11;
 
-directory = 'C:\Users\kreym\My Drive\PhD\Code\EMPIAR_10028_data\phase_flipped\';
+directory = '/Users/shaykreymer/My Drive/PhD/Code/EMPIAR_10028_data/phase_flipped';
 files = dir(fullfile(directory, '*.mrcs'));
 
 patches = [];
@@ -71,6 +71,7 @@ for i=[1] %, 7, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20]
     sigma2 = mean(noise_stack.^2, "all");
     patches = cat(1, patches, micrograph2patches(micrograph_downsampled, L));
 end
+patches = patches(1:10, :, :);
 Nd = size(patches, 1);
 
 'Finished micrographs loading.'
@@ -80,7 +81,7 @@ Nd = size(patches, 1);
 
 %% ell_max = 6
 % Volume expansion in 3-D Fourier-Bessel basis
-ell_max = 10;
+ell_max = 4;
 r_cut = 1 / 2;
 rad_size = floor(L / 2);
 % Generate 3-D Fourier-Bessel basis
@@ -99,16 +100,16 @@ vol_init_trunc = real(icfftn(vol_init_trunc));
 x_init = expand_vol_spherical_basis(vol_init_trunc, rad_size, ell_max, ...
     L, Psilms, jball);
 
-Ls = calc_shifts(L);
-NUMBER_OF_SHIFTS = size(Ls, 1);
+shifts = calc_shifts(L);
+NUM_SHIFTS = size(shifts, 1);
 
 beta0 = 0.55;
 rho_init = zeros(2*L, 2*L);
-for l=1:NUMBER_OF_SHIFTS
-    if (Ls(l, 1) == L) && (Ls(l, 2) == L)
-        rho_init(Ls(l, 1) + 1, Ls(l, 2) + 1) = beta0;
+for l=1:NUM_SHIFTS
+    if (shifts(l, 1) == L) && (shifts(l, 2) == L)
+        rho_init(shifts(l, 1) + 1, shifts(l, 2) + 1) = beta0;
     else
-        rho_init(Ls(l, 1) + 1, Ls(l, 2) + 1) = (1 - beta0) / (NUMBER_OF_SHIFTS - 1);
+        rho_init(shifts(l, 1) + 1, shifts(l, 2) + 1) = (1 - beta0) / (NUM_SHIFTS - 1);
     end
 end
 
@@ -147,14 +148,18 @@ psi_lsNn = calc_psi_lNs(ell_max, psi_Nn, betas, L, s_lens, n_list);
 
 lms_list = calc_lms_list(ell_max, s_lens);
 
+NUM_LMS = size(lms_list, 1);
 
 STOCHASTIC_FACTOR = 1;
 
-rotations = genRotationsGrid(35);
+rotations = genRotationsGrid(10);
+NUM_ROTATIONS = size(rotations, 3);
 
 %% Check projection matrix
-PR_matrix = proj_matrix(L, psi_lsNn, lms_list, n_list, rotations);
-PR_matrix_1 = PR_matrix( :, :, 1);
+PR_matrix_all_rotations = proj_matrix(L, psi_lsNn, lms_list, n_list, rotations);
+PR_matrix_all_rotations_all_shifts = shifted_proj_matrix(PR_matrix_all_rotations, L, shifts);
+PR_matrix_all_rotations_all_shifts = reshape(PR_matrix_all_rotations_all_shifts, L^2, NUM_LMS, NUM_ROTATIONS, NUM_SHIFTS);
+PR_matrix_1 = PR_matrix_all_rotations_all_shifts( :, :, 1, 40);
 x_init_vec = zeros(size(lms_list, 1), 1);
 for i=1:length(lms_list)
     ell = lms_list(i, 1);
@@ -175,22 +180,19 @@ end
 
 Z = C';
 
-shift = [0, 0]; %[41, 50];
+shift = shifts(40, :);
 % T1 = circshift(eye((2 * L) ^ 2), shift(1) * 2 * L);
 
 %% TODO: 
-% 1. general shift matrix
+% 1. general shift matrix - DONE
 % 2. optimize the sum over N
-T = circshift(eye((2 * L) ^ 2), shift(2) * 2 * L);
-
-patch_matrix = C * T * Z * PR_matrix_1;
-
-proj1 = reshape(real(patch_matrix * x_init_vec), L, L);
+proj1 = reshape(real(PR_matrix_1 * x_init_vec), L, L);
 figure; imagesc(proj1)
 
-patch_matrix_pinv = pinv(patch_matrix);
+patch_matrix_pinv = pinv(PR_matrix_1);
 tmp = patch_matrix_pinv * reshape(squeeze(patches(1, :, :)), [], 1);
-tmp2 = patch_matrix \ reshape(squeeze(patches(1, :, :)), [], 1);
+patches_reshaped = permute(reshape(patches, Nd, L^2), [2, 3, 4, 5, 1]);
+tmp2 = pagemldivide(PR_matrix_all_rotations_all_shifts, patches_reshaped);
 % tic;
 % gs = calc_g(Ls, L, rotations, psi_lsNn, lms_list, n_list);
 % toc;
@@ -201,5 +203,5 @@ NUM_ITERS = 1000;
 %% Stochastic approximate expectation-maximization
 [x_est, rho_est] = EM_stochastic_parallel(patches, x_init, rho_init, ...
     L, rotations, sigma2, jball, Psilms, ell_max, s_lens, n_list, ...
-    lms_list, Ls, psi_lsNn, STOCHASTIC_FACTOR, gs, NUM_ITERS);
+    lms_list, shifts, psi_lsNn, STOCHASTIC_FACTOR, gs, NUM_ITERS);
 
