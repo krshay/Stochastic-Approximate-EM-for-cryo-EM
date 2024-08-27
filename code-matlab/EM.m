@@ -100,8 +100,7 @@ while count <= NUM_ITERS
     %% Update x
     tic
     A_k = sum(pl_rot_curr_reshaped .* ATA, [3, 4, 5]);
-    y_k = sum(pl_rot_curr_reshaped ...
-        .* ATI, [3, 4, 5]);
+    y_k = sum(pl_rot_curr_reshaped .* ATI, [3, 4, 5]);
     x_updated = A_k \ y_k;
     toc
 

@@ -17,7 +17,7 @@ LL = 240;
 L = 7;
 
 %% Volume generation
-vol = load("TRPV1.mat");
+vol = load("../data-mat/TRPV1.mat");
 vol = vol.TRPV1_vol;
 
 LL = size(vol, 1);

@@ -1,6 +1,8 @@
+%% Script to generate mrc files from mat files.
+
 warning('off');
 addpath(genpath('../../ASPIRE'))
 
-vol = load("/Users/shaykreymer/My Drive/PhD/Code/Stochastic-Approximate-EM-for-cryo-EM/code-matlab/volume_curr28.mat");
+vol = load("../data-mat/volume_curr3.mat");
 vol = vol.volume_curr;
-WriteMRC(vol, 1, "/Users/shaykreymer/My Drive/PhD/Code/Stochastic-Approximate-EM-for-cryo-EM volumes/volume_curr28_pinv.mrc");
+WriteMRC(vol, 1, "../data-mrc/volume_curr3.mrc");

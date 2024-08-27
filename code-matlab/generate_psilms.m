@@ -1,7 +1,7 @@
 function Psilms = generate_psilms(jball, jjorigin, Y, dems_Y, dels_Y, ...
     r_cut, N, r_select_ratio, ell, ell_max, L)
 
-fname='Besselj_L200_S500.mat';
+fname='../data-mat/Besselj_L200_S500.mat';
 load(fname, 'B');
  
 % Choose ell, s, and roots by Nyquist criterion.

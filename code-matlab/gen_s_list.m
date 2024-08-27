@@ -14,7 +14,7 @@ function s_list = gen_s_list(maxL, r_cut, N)
 % Eitan Levin, August 2018
 
 % Load table of Bessel zeros
-fname='Besselj_L200_S500.mat';
+fname='../data-mat/Besselj_L200_S500.mat';
 load(fname, 'B') 
 
 r_select_ratio = 1;
